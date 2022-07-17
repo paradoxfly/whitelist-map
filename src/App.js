@@ -94,7 +94,10 @@ function App() {
     ...Common,
   
     viewWhitelist: async (address) => {
-      setWhitelist(whitelist => whitelist.push(address))
+      const copy = [...whitelist]
+      copy.push(address)
+      setWhitelist(copy)
+      console.log(address)
     },
 
   }
@@ -109,7 +112,7 @@ function App() {
 
     submitAddress: async () => {
       return new Promise((resolve, reject) => {
-        setResolver(resolve)
+        setResolver({resolve: () => resolve()})
         setView(views.SUBMIT_ADDRESS)
       }) 
     },
@@ -168,7 +171,7 @@ function App() {
 
       {
         view === views.SUBMIT_ADDRESS &&
-        <SubmitAddress accept={resolver} redirect={() => setView(views.DEPLOY_OR_ATTACH)}/>
+        <SubmitAddress accept={resolver.resolve} redirect={() => setView(views.DEPLOY_OR_ATTACH)}/>
       }
 
       {

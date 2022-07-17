@@ -1,4 +1,5 @@
 export function DisplayWhitelist({contractInfo, whitelist}){
+    console.log(whitelist)
     return(
         <div>
             <h2 className="animate">Waiting for attachers</h2>
