@@ -3,42 +3,38 @@ import { loadStdlib } from '@reach-sh/stdlib';
 import { ALGO_MyAlgoConnect as MyAlgoConnect } from '@reach-sh/stdlib';
 
 import './App.css';
-import { views } from './helpers/constants.js';
-import { useEffect, useState } from 'react';
+import { views } from './utils/constants.js';
+import { useState } from 'react';
 
 //views
 import { 
   ConnectAccount,
   DeployOrAttach,
-  SetWager,
   Deploying,
-  WaitForAttacher,
-  AcceptWager,
   Attaching,
-  WaitForTurn,
-  PlayTurn,
   Timeout,
-  SeeWinner,
-  PasteContractInfo
+  PasteContractInfo,
+  WhitelistSuccess,
+  SetTokenInfo,
+  SubmitAddress,
+  DisplayWhitelist
 } from './views/';
 
 const reach = loadStdlib('ALGO');
 reach.setWalletFallback(reach.walletFallback( { providerEnv: 'TestNet', MyAlgoConnect } ));
-const { standardUnit } = reach;
+const fmt = (x) => reach.formatCurrency(x, 4);
 
 function App() {
   const [ view, setView ] = useState(views.CONNECT_ACCOUNT);
-  const [ guess, setGuess ] = useState(undefined);
-  const [ round, setRound ] = useState(0);
+  const [ tokenBalance, setTokenBalance ] = useState(0);
   const [ outcome, setOutcome ] = useState();
-  const [ getHand, setGetHand ] = useState(false);
-  const [ playedTurn, setPlayedTurn ] = useState(false);
   const [ account, setAccount ] = useState({});
-  const [ isAlice, setIsAlice ] = useState(true);
   const [ resolver, setResolver ] = useState();
   const [ contractInfo, setContractInfo ] = useState("");
-  const [ wager, setWager ] = useState();
+  const [ whitelist, setWhitelist ] = useState([])
+  const [ viewOutcome, setViewOutcome ] = useState(false)
 
+  console.log(view)
   const helperFunctions = {
     connect: async (secret, mnemonic = false) => {
       let result = ""
@@ -55,132 +51,85 @@ function App() {
 
     setAsDeployer: (deployer = true) => {
       if(deployer){
-        setIsAlice(true);
-        setView(views.SET_WAGER);
+        setView(views.SET_TOKEN_INFO);
       }
       else{
-        setIsAlice(false);
         setView(views.PASTE_CONTRACT_INFO);
       }
     },
 
-    deploy: async (wager) => {
+    deploy: async () => {
+      const BFR = await reach.launchToken(account, "BFR", "BFR")
       const contract = account.contract(backend);
-      const deadline = {ETH: 10, ALGO: 100, CFX: 1000}[reach.connector];
-      Alice.wager = reach.parseCurrency(wager);
-      Alice.deadline = deadline;
-      backend.Alice(contract, Alice);
+      backend.Deployer(contract, {
+        ...Deployer, 
+        getTokenId: async () => {
+          setTokenBalance(fmt(await reach.balanceOf(account, BFR.id)))
+          return BFR.id
+        }
+      });
       setView(views.DEPLOYING);
-      setContractInfo( JSON.stringify(await contract.getInfo(), null, 2) );
+      const ctcInfo = JSON.stringify(await contract.getInfo(), null, 2)
+      setContractInfo(ctcInfo);
+      setView(views.DISPLAY_WHITELIST)
     },
 
     attach: (contractInfo) => {
       const contract = account.contract(backend, JSON.parse(contractInfo));
-      backend.Bob(contract, Bob)
+      backend.Attacher(contract, Attacher)
     },
-
-    guess: (hand) => {
-      setGuess(hand)
-    },
-
-    played: () => {
-      setPlayedTurn(true);
-      setView(views.WAIT_FOR_TURN)
-    },
-
-    playAgain: () => {
-      setView(views.DEPLOY_OR_ATTACH);
-      setRound(0);
-    }
 
   };
 
-  const Player = {
+  const Common = {
     random: () => reach.hasRandom.random(),
-
-    informNewRound: () => {
-      setRound(round => round + 1);
-      setView(views.PLAY_TURN);
-      setGuess(undefined);
-      setPlayedTurn(false);
-      setResolver();
-    },
   
-    getRandom: () => {
-      const random = Math.floor(Math.random()*5);
-      console.log("random", random);
-      return random;
+    checkBalance: async (token) => {
+      const tokBal = fmt(await reach.balanceOf(account, token))
+      setTokenBalance(tokBal)
+    },
+  }
+
+  const Deployer = {
+    ...Common,
+  
+    viewWhitelist: async (address) => {
+      setWhitelist(whitelist => whitelist.push(address))
     },
 
-    seeOutcome: (outcomeHex) => {
-      const outcome = parseInt(outcomeHex);
+  }
+
+  const Attacher = {
+    ...Common,
+
+    acceptToken: async (token) => {
+      const tokenID = reach.bigNumberToNumber(token)
+      await account.tokenAccept(tokenID)
+    },
+
+    submitAddress: async () => {
+      return new Promise((resolve, reject) => {
+        setResolver(resolve)
+        setView(views.SUBMIT_ADDRESS)
+      }) 
+    },
+
+    whitelistSuccess: (outcome) => {
       setOutcome(outcome)
-      setView(views.SEE_WINNER)
+      setViewOutcome(true)
     },
 
-    informTimeout: () => {
-      setView(views.TIME_OUT);
-    },
-
-    getHand: async () => {
-      setGetHand(true);
-      return new Promise(resolve => {
-        setResolver({
-          resolve: (hand) => {
-            resolve(hand);
-          },
-        })
-      })
+    timeout: () => {
+      setView(views.TIME_OUT)
     }
   }
-
-  const Alice = {
-    ...Player,
-
-    wager: 0,
-
-    deadline: 0,
-  
-    setWagerAndDeadline: ( wager, deadline) => {
-      this.wager = wager;
-      this.deadline = deadline;
-    },
-  
-    waitingForAttacher: () => {
-      setView(views.WAIT_FOR_ATTACHER);
-    },
-  }
-
-  const Bob = {
-    ...Player,
-
-    acceptWager: async (wager) => {
-      setView(views.ACCEPT_WAGER);
-      setWager(reach.formatCurrency(wager, 4));
-      return new Promise((resolve) => {
-        setResolver({
-          resolve: () => {
-            setView(views.ATTACHING);
-            resolve();
-          },
-        })
-      });
-    },
-  }
-
-  useEffect(()=>{
-    if(getHand && playedTurn){
-      resolver.resolve(guess);
-      setGetHand(false);
-    }
-  }, [getHand, playedTurn, guess, resolver])
-
 
   return (
     <div className="App">
 
       <div className='topnav'>
-        <h1>Price Is Right</h1>
+        <h1>Whitelist</h1>
+        <p>Token Balance: {tokenBalance}</p>
       </div>
       
       {
@@ -194,8 +143,8 @@ function App() {
       }
 
       {
-        view === views.SET_WAGER &&
-        <SetWager deploy={helperFunctions.deploy}/>
+        view === views.SET_TOKEN_INFO&&
+        <SetTokenInfo deploy={helperFunctions.deploy}/>
       }
 
       {
@@ -204,8 +153,8 @@ function App() {
       }
 
       {
-        view === views.WAIT_FOR_ATTACHER &&
-        <WaitForAttacher contractInfo={contractInfo}/>
+        view === views.DISPLAY_WHITELIST &&
+        <DisplayWhitelist whitelist={whitelist} contractInfo={contractInfo}/>
       }
 
       {
@@ -214,8 +163,12 @@ function App() {
       }
 
       {
-        view === views.ACCEPT_WAGER &&
-        <AcceptWager wager={wager} standardUnit={standardUnit} accept={resolver.resolve} decline={() => setView(views.DEPLOY_OR_ATTACH)}/>
+        viewOutcome && <WhitelistSuccess outcome={outcome} />
+      }
+
+      {
+        view === views.SUBMIT_ADDRESS &&
+        <SubmitAddress accept={resolver} redirect={() => setView(views.DEPLOY_OR_ATTACH)}/>
       }
 
       {
@@ -224,34 +177,10 @@ function App() {
       }
 
       {
-        view === views.WAIT_FOR_TURN &&
-        <>
-          {
-            guess !== undefined && <h3 className='guess'>You played {guess}</h3>
-          }
-          <WaitForTurn />
-        </>
-        
-      }
-
-      {
-        view === views.PLAY_TURN && 
-        <PlayTurn 
-          guess={helperFunctions.guess} 
-          played={helperFunctions.played}
-          round={round}
-        />
-      }
-
-      {
         view === views.TIME_OUT &&
         <Timeout />
       }
 
-      {
-        view === views.SEE_WINNER &&
-        <SeeWinner outcome={outcome} isAlice={isAlice} playAgain={helperFunctions.playAgain}/>
-      }
     </div>
   );
 }

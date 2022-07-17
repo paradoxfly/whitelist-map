@@ -3,20 +3,17 @@ const views = {
     DEPLOY_OR_ATTACH: 'Deploy or attach',
 
     //Deploy
-    SET_WAGER: 'Set wager',
+    SET_TOKEN_INFO: 'Set token info',
     DEPLOYING: 'Deploying',
-    WAIT_FOR_ATTACHER: 'Wait for attacher',
+    DISPLAY_WHITELIST: 'Display whitelist',
     
     //Attach
     PASTE_CONTRACT_INFO: 'Paste contract info',
-    ACCEPT_WAGER: 'Accept wager',
     ATTACHING: 'Attaching',
 
     //Generic views
-    WAIT_FOR_TURN: 'Wait for turn',
-    PLAY_TURN: 'Play turn',
+    SUBMIT_ADDRESS: 'Submit address',
     TIME_OUT: 'Timeout',
-    SEE_WINNER: 'See winner'
 };
 
 export {
